@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr. Chicken Slot Machine</title>
+<style>
+:root{
+  --gold:#d18b00;
+  --gold-dark:#9b6400;
+  --cream:#fff7d6;
+  --green:#188a39;
+  --ink:#302410;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:Arial,Helvetica,sans-serif;
+  text-align:center;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at top left, #ffe691 0, transparent 32%),
+    linear-gradient(180deg,#fff7d6 0%,#ffe9a3 100%);
+}
+main{
+  width:min(96vw,640px);
+  margin:0 auto;
+  padding:24px 12px 30px;
+}
+h1{
+  margin:0 0 14px;
+  color:var(--gold-dark);
+  font-size:clamp(2rem,7vw,3.3rem);
+}
+.machine{
+  padding:16px;
+  border:4px solid var(--gold);
+  border-radius:14px;
+  background:#fffdf2;
+  box-shadow:0 10px 28px rgba(92,58,0,.2);
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(54px,90px));
+  gap:6px;
+  justify-content:center;
+  margin:4px auto 16px;
+  transition:transform .35s ease, filter .35s ease;
+}
+.cell{
+  aspect-ratio:1;
+  border:3px solid var(--gold);
+  border-radius:10px;
+  background:white;
+  font-size:clamp(28px,8vw,42px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .18s, box-shadow .18s, transform .18s;
+}
+.win{
+  background:#fff59d;
+  box-shadow:0 0 14px gold;
+  transform:scale(1.04);
+}
+.grid.jackpot-mode{
+  transform:scale(1.08);
+  filter:drop-shadow(0 12px 22px rgba(209,139,0,.32));
+}
+.cell.locked{
+  background:#fff2a6;
+  box-shadow:0 0 18px rgba(255,191,0,.78);
+  animation:lockedPulse .55s ease-in-out infinite alternate;
+}
+.cell.suspense{
+  z-index:2;
+  border-color:#ff5b35;
+  background:#fff;
+  box-shadow:0 0 26px rgba(255,91,53,.95),0 0 48px rgba(255,213,79,.9);
+  animation:suspenseShake .16s linear infinite, suspenseGlow .5s ease-in-out infinite alternate;
+}
+.cell.final-focus{
+  z-index:3;
+  border-color:#ff2d00;
+  box-shadow:0 0 34px rgba(255,45,0,1),0 0 70px rgba(255,213,79,1);
+  animation:finalFocusShake .13s linear infinite, suspenseGlow .38s ease-in-out infinite alternate;
+}
+.cell.jackpot-pop{
+  animation:jackpotPop .7s cubic-bezier(.2,1.5,.35,1) both;
+}
+#info.jackpot-text{
+  font-size:clamp(1.15rem,4vw,1.65rem);
+  color:#c83d13;
+  text-shadow:0 0 14px rgba(255,213,79,.85);
+  animation:textPulse .45s ease-in-out infinite alternate;
+}
+@keyframes lockedPulse{
+  from{transform:scale(1);filter:saturate(1)}
+  to{transform:scale(1.06);filter:saturate(1.35)}
+}
+@keyframes suspenseShake{
+  0%,100%{transform:scale(1.22) rotate(-2deg)}
+  50%{transform:scale(1.31) rotate(2deg)}
+}
+@keyframes finalFocusShake{
+  0%,100%{transform:scale(1.48) rotate(-3deg)}
+  50%{transform:scale(1.62) rotate(3deg)}
+}
+@keyframes suspenseGlow{
+  from{filter:saturate(1)}
+  to{filter:saturate(1.8)}
+}
+@keyframes jackpotPop{
+  0%{transform:scale(1.35) rotate(-4deg)}
+  55%{transform:scale(1.7) rotate(3deg)}
+  100%{transform:scale(1.08) rotate(0)}
+}
+@keyframes textPulse{
+  from{transform:scale(1)}
+  to{transform:scale(1.05)}
+}
+button{
+  min-height:42px;
+  padding:10px 14px;
+  margin:5px;
+  border:2px solid var(--gold);
+  border-radius:8px;
+  background:#fff6c7;
+  color:#3c2a00;
+  font-weight:bold;
+  cursor:pointer;
+}
+button:hover{background:#ffe88c}
+button:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+#spinBtn{
+  width:min(260px,90%);
+  font-size:1.08rem;
+  background:#ffd54f;
+}
+.panel{
+  border:1px solid #c7aa55;
+  background:white;
+  width:min(100%,360px);
+  margin:14px auto;
+  padding:12px;
+  border-radius:10px;
+}
+.panel-title{
+  display:block;
+  margin-bottom:6px;
+  font-size:1.08rem;
+}
+#market{
+  border-width:2px;
+  border-color:var(--gold);
+  background:#fffaf0;
+  margin-bottom:0;
+}
+#payoutChoices[hidden]{display:none}
+#stats{
+  margin-top:8px;
+  font-weight:bold;
+}
+#earned{
+  min-height:34px;
+  font-size:28px;
+  color:var(--green);
+  font-weight:bold;
+  margin-top:10px;
+}
+#info{
+  min-height:24px;
+  font-weight:bold;
+  color:var(--gold-dark);
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>🐔 Mr. Chicken Slot Machine</h1>
+  <section class="machine" aria-label="Slot machine">
+    <div class="grid" id="grid"></div>
+    <button id="spinBtn" onclick="spin()">SPIN (1 coin)</button>
+
+    <div id="stats"></div>
+    <div id="earned">💰 Earned: 0</div>
+    <div id="info"></div>
+
+    <div id="market" class="panel">
+      <span class="panel-title"><b>🏪 Market</b></span>
+      <button id="luckBtn" onclick="buyLuck()">🍀 Luck (25)</button>
+      <button id="multBtn" onclick="buyMult()">🔥 Multiplier (50)</button>
+      <button id="jackpotBtn" onclick="buyJackpot()">🎰 Jackpot Chance (40)</button>
+      <br>
+      <button id="payoutToggle" onclick="togglePayouts()" aria-expanded="false">Show Payout Upgrades</button>
+      <div id="payoutChoices" hidden></div>
+    </div>
+  </section>
+</main>
+
+<script>
+let coins=30,shopMult=1,streakMult=1,luck=0,jackpotLevel=0,spinning=false;
+const symbols=["🐔","🐦","🌽","🚜","🌾","💧"];
+const symbolPayouts=Object.fromEntries(symbols.map(symbol=>[symbol,0]));
+const grid=document.getElementById("grid");
+
+for(let i=0;i<15;i++){
+  const d=document.createElement("div");
+  d.className="cell";
+  d.textContent="❔";
+  grid.appendChild(d);
+}
+
+const payoutChoices=document.getElementById("payoutChoices");
+symbols.forEach((symbol,index)=>{
+  const btn=document.createElement("button");
+  btn.id=`payout-${index}`;
+  btn.onclick=()=>buyPayout(symbol);
+  payoutChoices.appendChild(btn);
+});
+
+function beep(freq,dur){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator();
+    const g=ctx.createGain();
+    o.frequency.value=freq;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    g.gain.setValueAtTime(0.08,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+dur);
+    o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+
+function playTone(ctx,freq,start,dur,type="sine",volume=0.08){
+  const o=ctx.createOscillator();
+  const g=ctx.createGain();
+  o.type=type;
+  o.frequency.setValueAtTime(freq,start);
+  g.gain.setValueAtTime(0.0001,start);
+  g.gain.exponentialRampToValueAtTime(volume,start+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(start);
+  o.stop(start+dur+0.03);
+}
+
+function playJackpotBuild(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const now=ctx.currentTime;
+    const notes=[220,277,330,415,554,660,831,988];
+
+    for(let i=0;i<42;i++){
+      const start=now+i*0.125;
+      const freq=notes[i%notes.length]*(i>15?1.5:1);
+      playTone(ctx,freq,start,0.09,i%2?"square":"triangle",0.045+i*0.002);
+      if(i%4===0) playTone(ctx,110,start,0.06,"sawtooth",0.035);
+    }
+
+    const riser=ctx.createOscillator();
+    const gain=ctx.createGain();
+    riser.type="sawtooth";
+    riser.frequency.setValueAtTime(180,now);
+    riser.frequency.exponentialRampToValueAtTime(1200,now+5.55);
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.exponentialRampToValueAtTime(0.055,now+0.2);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+5.58);
+    riser.connect(gain);
+    gain.connect(ctx.destination);
+    riser.start(now);
+    riser.stop(now+5.6);
+  }catch(e){}
+}
+
+function playJackpotDrop(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const now=ctx.currentTime;
+    playTone(ctx,82,now,0.5,"sawtooth",0.16);
+    playTone(ctx,164,now,0.32,"square",0.11);
+    playTone(ctx,659,now+0.02,0.18,"triangle",0.12);
+    playTone(ctx,988,now+0.12,0.16,"triangle",0.09);
+    playTone(ctx,1318,now+0.24,0.22,"triangle",0.08);
+    playTone(ctx,55,now+0.28,0.35,"sine",0.14);
+  }catch(e){}
+}
+
+function scaledCost(base,level,growth){
+  return Math.ceil((base*Math.pow(growth,level))/5)*5;
+}
+
+function luckCost(){ return scaledCost(25,luck,1.65); }
+function multCost(){ return scaledCost(50,shopMult-1,2.25); }
+function payoutCost(symbol){ return scaledCost(20,symbolPayouts[symbol],1.85); }
+function jackpotCost(){ return scaledCost(40,jackpotLevel,1.8); }
+
+function randomSymbol(luckySymbol){
+  const luckyChance=Math.min(0.35,luck*0.025);
+  if(luckySymbol&&Math.random()<luckyChance) return luckySymbol;
+  return symbols[Math.floor(Math.random()*symbols.length)];
+}
+
+function update(){
+  const topPayout=Math.max(...Object.values(symbolPayouts));
+  document.getElementById("stats").textContent=`Coins: ${coins} | Mult: x${shopMult} | Streak: x${streakMult} | Luck: ${luck} | Jackpot: ${Math.round((0.015+jackpotLevel*0.005)*100)}% | Best Payout: +${topPayout}`;
+  document.getElementById("spinBtn").textContent="SPIN (1 coin)";
+  document.getElementById("spinBtn").disabled=spinning||coins<=0;
+  document.getElementById("luckBtn").textContent=`🍀 Luck (${luckCost()})`;
+  document.getElementById("multBtn").textContent=`🔥 Multiplier (${multCost()})`;
+  document.getElementById("jackpotBtn").textContent=`🎰 Jackpot Chance (${jackpotCost()})`;
+  document.getElementById("luckBtn").disabled=spinning||coins<luckCost();
+  document.getElementById("multBtn").disabled=spinning||coins<multCost();
+  document.getElementById("jackpotBtn").disabled=spinning||coins<jackpotCost();
+  symbols.forEach(symbol=>{
+    const btn=document.getElementById(`payout-${symbols.indexOf(symbol)}`);
+    btn.textContent=`${symbol} Payout +${symbolPayouts[symbol]} (${payoutCost(symbol)})`;
+    btn.disabled=spinning||coins<payoutCost(symbol);
+  });
+}
+
+function clearWin(){
+  grid.classList.remove("jackpot-mode");
+  document.getElementById("info").classList.remove("jackpot-text");
+  document.querySelectorAll(".cell").forEach(c=>c.classList.remove("win","locked","suspense","final-focus","jackpot-pop"));
+}
+
+function evaluateBoard(board,cells){
+  let reward=0;
+  const won=new Set();
+
+  function add(idxs,val){
+    const symbol=board[idxs[0]];
+    reward+=(val+symbolPayouts[symbol])*shopMult*streakMult;
+    idxs.forEach(i=>won.add(i));
+  }
+
+  for(let r=0;r<3;r++){
+    const b=r*5;
+    if(board[b]===board[b+1]&&board[b]===board[b+2]&&board[b]===board[b+3]&&board[b]===board[b+4]){
+      add([b,b+1,b+2,b+3,b+4],10);
+    }else{
+      if(board[b]===board[b+1]&&board[b]===board[b+2]&&board[b]===board[b+3]) add([b,b+1,b+2,b+3],5);
+      if(board[b+1]===board[b+2]&&board[b+1]===board[b+3]&&board[b+1]===board[b+4]) add([b+1,b+2,b+3,b+4],5);
+
+      for(let start=0;start<=2;start++){
+        const i=b+start;
+        if(board[i]===board[i+1]&&board[i]===board[i+2]) add([i,i+1,i+2],3);
+      }
+    }
+  }
+
+  for(let c=0;c<5;c++){
+    if(board[c]===board[c+5]&&board[c]===board[c+10]) add([c,c+5,c+10],3);
+  }
+
+  for(let c=0;c<=2;c++){
+    const i=c;
+    if(board[i]===board[i+6]&&board[i]===board[i+12]) add([i,i+6,i+12],3);
+  }
+
+  for(let c=2;c<5;c++){
+    const i=c;
+    if(board[i]===board[i+4]&&board[i]===board[i+8]) add([i,i+4,i+8],3);
+  }
+
+  won.forEach(i=>cells[i].classList.add("win"));
+  return reward;
+}
+
+function jackpotReward(cells,jackpotSymbol){
+  document.querySelectorAll(".cell").forEach(c=>c.classList.add("win"));
+  beep(900,0.45);
+  return (75+symbolPayouts[jackpotSymbol])*shopMult*streakMult;
+}
+
+function finishSpin(reward,message){
+  const usedMult=shopMult*streakMult;
+
+  if(reward>0){
+    streakMult=Math.min(streakMult+1,5);
+    beep(700,0.2);
+    document.getElementById("info").textContent=message||`WIN! Mult x${usedMult}`;
+  }else{
+    streakMult=1;
+    document.getElementById("info").textContent="No win";
+  }
+
+  coins+=reward;
+  spinning=false;
+  document.getElementById("earned").textContent="💰 Earned: "+reward;
+  update();
+}
+
+function spin(){
+  if(coins<=0||spinning) return;
+  spinning=true;
+  coins--;
+  clearWin();
+  beep(300,0.08);
+  update();
+
+  const cells=document.getElementsByClassName("cell");
+  const luckySymbol=luck>0?symbols[Math.floor(Math.random()*symbols.length)]:null;
+  const isJackpot=Math.random()<(0.015+jackpotLevel*0.005);
+  let t=0;
+
+  const anim=setInterval(()=>{
+    for(let i=0;i<15;i++){
+      cells[i].textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    }
+    t++;
+    if(t>15){
+      clearInterval(anim);
+
+      if(isJackpot){
+        const jackpotSymbol=symbols[Math.floor(Math.random()*symbols.length)];
+        const board=Array(15).fill(jackpotSymbol);
+        grid.classList.add("jackpot-mode");
+        document.getElementById("info").classList.add("jackpot-text");
+
+        for(let r=0;r<3;r++){
+          for(let c=0;c<4;c++){
+            const lockedCell=cells[r*5+c];
+            lockedCell.textContent=jackpotSymbol;
+            lockedCell.classList.add("locked");
+          }
+        }
+
+        for(let r=0;r<3;r++){
+          cells[r*5+4].classList.add("suspense");
+        }
+
+        document.getElementById("info").textContent="";
+        playJackpotBuild();
+        let suspense=0;
+        function finalColumnTick(){
+          const spinningRows=suspense<14?[0,1,2]:suspense<28?[1,2]:[2];
+          spinningRows.forEach(r=>{
+            cells[r*5+4].textContent=symbols[Math.floor(Math.random()*symbols.length)];
+          });
+          if(suspense>=28){
+            cells[14].classList.add("final-focus");
+          }
+          suspense++;
+
+          if(suspense===14){
+            const firstCell=cells[4];
+            firstCell.textContent=jackpotSymbol;
+            firstCell.classList.remove("suspense");
+            firstCell.classList.add("locked","jackpot-pop");
+            beep(520,0.1);
+          }
+
+          if(suspense===28){
+            const secondCell=cells[9];
+            secondCell.textContent=jackpotSymbol;
+            secondCell.classList.remove("suspense");
+            secondCell.classList.add("locked","jackpot-pop");
+            cells[14].classList.add("final-focus");
+            beep(640,0.12);
+          }
+
+          if(suspense>46){
+            playJackpotDrop();
+            for(let r=0;r<3;r++){
+              const finalCell=cells[r*5+4];
+              finalCell.textContent=jackpotSymbol;
+              finalCell.classList.remove("suspense","final-focus");
+              finalCell.classList.add("jackpot-pop");
+            }
+
+            const reward=jackpotReward(cells,jackpotSymbol);
+            finishSpin(reward,`JACKPOT! ${jackpotSymbol} Mult x${shopMult*streakMult} | ${jackpotSymbol} Payout +${symbolPayouts[jackpotSymbol]}`);
+            setTimeout(()=>{
+              grid.classList.remove("jackpot-mode");
+              document.getElementById("info").classList.remove("jackpot-text");
+              document.querySelectorAll(".cell").forEach(c=>c.classList.remove("locked","final-focus","jackpot-pop"));
+            },1800);
+          }else{
+            const slowPhase=Math.max(0,suspense-28);
+            const nextDelay=75+Math.pow(slowPhase/18,2)*330;
+            setTimeout(finalColumnTick,nextDelay);
+          }
+        }
+        finalColumnTick();
+        return;
+      }
+
+      const board=[];
+      for(let i=0;i<15;i++){
+        board[i]=randomSymbol(luckySymbol);
+        cells[i].textContent=board[i];
+      }
+
+      const reward=evaluateBoard(board,cells);
+      const luckyText=luckySymbol?` | Lucky ${luckySymbol}`:"";
+      finishSpin(reward,reward>0?`WIN! Mult x${shopMult*streakMult}${luckyText}`:null);
+    }
+  },55);
+}
+
+function buyLuck(){
+  const cost=luckCost();
+  if(coins>=cost&&!spinning){
+    coins-=cost;
+    luck++;
+    document.getElementById("info").textContent=`Luck upgraded to ${luck}`;
+    update();
+  }
+}
+
+function buyMult(){
+  const cost=multCost();
+  if(coins>=cost&&!spinning){
+    coins-=cost;
+    shopMult++;
+    document.getElementById("info").textContent=`Multiplier upgraded to x${shopMult}`;
+    update();
+  }
+}
+
+function buyPayout(symbol){
+  const cost=payoutCost(symbol);
+  if(coins>=cost&&!spinning){
+    coins-=cost;
+    symbolPayouts[symbol]++;
+    document.getElementById("info").textContent=`${symbol} payout upgraded to +${symbolPayouts[symbol]}`;
+    update();
+  }
+}
+
+function togglePayouts(){
+  const choices=document.getElementById("payoutChoices");
+  const isHidden=choices.hidden;
+  choices.hidden=!isHidden;
+  const toggle=document.getElementById("payoutToggle");
+  toggle.textContent=isHidden?"Hide Payout Upgrades":"Show Payout Upgrades";
+  toggle.setAttribute("aria-expanded",String(isHidden));
+}
+
+function buyJackpot(){
+  const cost=jackpotCost();
+  if(coins>=cost&&!spinning){
+    coins-=cost;
+    jackpotLevel++;
+    document.getElementById("info").textContent=`Jackpot chance upgraded to ${Math.round((0.015+jackpotLevel*0.005)*100)}%`;
+    update();
+  }
+}
+
+
+update();
+</script>
+</body>
+</html>
