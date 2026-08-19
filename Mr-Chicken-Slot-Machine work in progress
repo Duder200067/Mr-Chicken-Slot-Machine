@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr. Chicken Slot Machine</title>
+<style>
+:root{
+  --gold:#d18b00;
+  --gold-dark:#9b6400;
+  --cream:#fff7d6;
+  --green:#188a39;
+  --ink:#302410;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  font-family:Arial,"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif;
+  text-align:center;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at top left, #ffe691 0, transparent 32%),
+    linear-gradient(180deg,#fff7d6 0%,#ffe9a3 100%);
+}
+main{
+  width:min(96vw,640px);
+  margin:0 auto;
+  padding:24px 12px 30px;
+}
+h1{
+  margin:0 0 14px;
+  color:var(--gold-dark);
+  font-size:clamp(2rem,7vw,3.3rem);
+}
+.machine{
+  position:relative;
+  padding:16px;
+  border:4px solid var(--gold);
+  border-radius:14px;
+  background:#fffdf2;
+  box-shadow:0 10px 28px rgba(92,58,0,.2);
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(54px,90px));
+  column-gap:6px;
+  row-gap:13px;
+  justify-content:center;
+  margin:4px auto 16px;
+  transition:transform .35s ease, filter .35s ease;
+}
+.mini-slots{
+  display:none;
+  grid-template-columns:190px 190px;
+  grid-template-areas:"lt rt" "lb rb";
+  grid-template-rows:1fr 1fr;
+  gap:10px;
+  position:absolute;
+  left:50%;
+  top:70px;
+  width:min(96vw,1040px);
+  min-height:300px;
+  transform:translateX(-50%);
+  justify-content:space-between;
+  align-items:stretch;
+  pointer-events:none;
+  z-index:1;
+}
+.mini-slots.active{
+  display:grid;
+}
+.mini-grid:nth-child(1){grid-area:lt}
+.mini-grid:nth-child(2){grid-area:rt}
+.mini-grid:nth-child(3){grid-area:lb}
+.mini-grid:nth-child(4){grid-area:rb}
+.mini-grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  grid-template-rows:repeat(3,1fr);
+  gap:3px;
+  padding:6px;
+  border:2px solid var(--gold);
+  border-radius:8px;
+  background:#fffaf0;
+  pointer-events:auto;
+  min-height:142px;
+  width:190px;
+  overflow:hidden;
+}
+.mini-grid.hidden{display:none}
+.mini-cell{
+  min-width:0;
+  aspect-ratio:1;
+  border:1px solid #d18b00;
+  border-radius:5px;
+  background:white;
+  font-size:clamp(15px,2.4vw,22px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.mini-cell.win{
+  background:#fff59d;
+  box-shadow:0 0 8px gold;
+}
+.cell{
+  aspect-ratio:1;
+  border:3px solid var(--gold);
+  border-radius:10px;
+  background:white;
+  font-size:clamp(28px,8vw,42px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .18s, box-shadow .18s, transform .18s;
+}
+/* Factory no good replaces every visual surface while keeping controls readable. */
+body.factory-mode,
+body.factory-mode *{
+  background-color:#ffb100 !important;
+  background-image:url("factory-no-good.png") !important;
+  background-size:100% 100% !important;
+  background-position:center !important;
+  background-repeat:no-repeat !important;
+}
+body.factory-mode{background-attachment:fixed}
+body.factory-mode button,
+body.factory-mode input{color:#fff7d6;text-shadow:1px 1px 2px #000,0 0 4px #000}
+body.factory-mode button:hover,
+body.factory-mode button:disabled,
+body.factory-mode .modal{background-image:url("factory-no-good.png") !important}
+.grid{position:relative;z-index:2}
+.win{
+  background:#fff59d;
+  box-shadow:0 0 14px gold;
+  transform:scale(1.04);
+}
+.grid.jackpot-mode{
+  transform:scale(1.08);
+  filter:drop-shadow(0 12px 22px rgba(209,139,0,.32));
+}
+.cell.locked{
+  background:#fff2a6;
+  box-shadow:0 0 18px rgba(255,191,0,.78);
+  animation:lockedPulse .55s ease-in-out infinite alternate;
+}
+.cell.suspense{
+  z-index:2;
+  border-color:#ff5b35;
+  background:#fff;
+  box-shadow:0 0 26px rgba(255,91,53,.95),0 0 48px rgba(255,213,79,.9);
+  animation:suspenseShake .16s linear infinite, suspenseGlow .5s ease-in-out infinite alternate;
+}
+.cell.final-focus{
+  z-index:3;
+  border-color:#ff2d00;
+  box-shadow:0 0 34px rgba(255,45,0,1),0 0 70px rgba(255,213,79,1);
+  animation:finalFocusShake .13s linear infinite, suspenseGlow .38s ease-in-out infinite alternate;
+}
+.cell.jackpot-pop{
+  animation:jackpotPop .7s cubic-bezier(.2,1.5,.35,1) both;
+}
+#info.jackpot-text{
+  font-size:clamp(1.15rem,4vw,1.65rem);
+  color:#c83d13;
+  text-shadow:0 0 14px rgba(255,213,79,.85);
+  animation:textPulse .45s ease-in-out infinite alternate;
+}
+@keyframes lockedPulse{
+  from{transform:scale(1);filter:saturate(1)}
+  to{transform:scale(1.06);filter:saturate(1.35)}
+}
+@keyframes suspenseShake{
+  0%,100%{transform:scale(1.22) rotate(-2deg)}
+  50%{transform:scale(1.31) rotate(2deg)}
+}
+@keyframes finalFocusShake{
+  0%,100%{transform:scale(1.48) rotate(-3deg)}
+  50%{transform:scale(1.62) rotate(3deg)}
+}
+@keyframes suspenseGlow{
+  from{filter:saturate(1)}
+  to{filter:saturate(1.8)}
+}
+@keyframes jackpotPop{
+  0%{transform:scale(1.35) rotate(-4deg)}
+  55%{transform:scale(1.7) rotate(3deg)}
+  100%{transform:scale(1.08) rotate(0)}
+}
+@keyframes textPulse{
+  from{transform:scale(1)}
+  to{transform:scale(1.05)}
+}
+button{
+  min-height:42px;
+  padding:10px 14px;
+  margin:5px;
+  border:2px solid var(--gold);
+  border-radius:8px;
+  background:#fff6c7;
+  color:#3c2a00;
+  font-weight:bold;
+  cursor:pointer;
+}
+button:hover{background:#ffe88c}
+button:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+#spinBtn{
+  width:min(260px,90%);
+  font-size:1.08rem;
+  background:#ffd54f;
+}
+.spin-row{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+#spinModeBtn,#audioBtn,#menuBtn{
+  min-width:84px;
+}
+#audioBtn{display:none}
+.panel{
+  border:1px solid #c7aa55;
+  background:white;
+  width:min(100%,360px);
+  margin:14px auto;
+  padding:12px;
+  border-radius:10px;
+}
+.panel-title{
+  display:block;
+  margin-bottom:6px;
+  font-size:1.08rem;
+}
+#market{
+  border-width:2px;
+  border-color:var(--gold);
+  background:#fffaf0;
+  margin-bottom:0;
+}
+#stats{
+  margin-top:8px;
+  font-weight:bold;
+}
+#earned{
+  min-height:34px;
+  font-size:28px;
+  color:var(--green);
+  font-weight:bold;
+  margin-top:10px;
+}
+#info{
+  min-height:24px;
+  font-weight:bold;
+  color:var(--gold-dark);
+}
+#darkCoin{
+  position:fixed;
+  left:12px;
+  bottom:12px;
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  border:3px solid #1d160d;
+  background:radial-gradient(circle at 35% 30%,#4b3a1d,#111 68%);
+  box-shadow:0 0 16px rgba(0,0,0,.55);
+  cursor:pointer;
+}
+#sideMenu{
+  position:fixed;
+  right:12px;
+  top:12px;
+  z-index:8;
+}
+#sickleOffer{
+  display:none;
+  position:fixed;
+  right:12px;
+  bottom:12px;
+  z-index:9;
+  padding:12px;
+  border:3px solid var(--gold);
+  border-radius:10px;
+  background:#fffdf2;
+  box-shadow:0 12px 28px rgba(48,36,16,.28);
+}
+#sickleOffer.active{
+  display:block;
+}
+.modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:12;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(28,20,10,.52);
+}
+.modal.active{
+  display:flex;
+}
+#startModal{z-index:30;background:linear-gradient(135deg,rgba(255,222,92,.96),rgba(247,142,12,.96))}
+.start-card{width:min(95vw,570px);padding:46px 28px;background:linear-gradient(145deg,#fff7a8,#ffbf2f 55%,#ef8305)}
+.start-card h2{font-size:clamp(2.45rem,9vw,4rem);margin-bottom:10px}
+.start-card p{margin:0 0 16px;font-weight:bold}
+.difficulty-options{display:none;gap:8px;margin-top:14px}
+.difficulty-options.active{display:grid}
+.difficulty-options button{margin:0}
+.difficulty-options small{display:block;margin-top:3px;font-weight:normal}
+.sack-activate{display:none;position:fixed;z-index:26;right:18px;top:35%;width:190px;padding:12px;border:3px solid var(--gold);border-radius:14px;background:#fffdf2;box-shadow:0 10px 24px rgba(48,36,16,.3)}
+.sack-activate.active{display:block}
+.bag{position:relative;width:80px;height:92px;margin:8px auto;border-radius:40% 40% 30% 30%;background:#96613b;box-shadow:inset 12px 0 rgba(255,255,255,.18),inset -10px 0 rgba(0,0,0,.18);border:2px solid rgba(70,35,10,.5)}
+.bag::before{content:"";position:absolute;left:15px;top:-16px;width:46px;height:28px;border-radius:50%;background:inherit;border:2px solid rgba(70,35,10,.5)}
+.bag::after{content:"";position:absolute;left:9px;right:9px;top:12px;border-top:4px solid #f3cd7d}
+.bag-name{font-weight:bold;color:#6f4116}
+.patterns-card{width:min(96vw,760px);max-height:88vh;overflow:auto}
+.pattern-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin:14px 0;text-align:center}
+.pattern-tile{padding:10px;border:2px solid #e1ac20;border-radius:12px;background:#fff8d9}
+.pattern-mini{display:grid;grid-template-columns:repeat(5,18px);grid-template-rows:repeat(3,18px);gap:3px;justify-content:center;margin:0 auto 8px}
+.pattern-mini span{border:1px solid #c98700;border-radius:4px;background:#fffdf2}
+.pattern-mini span.on{background:#fff27b;box-shadow:0 0 7px #ffbc00}
+.pattern-payout{font-weight:bold;color:#875500}
+#retryModal{z-index:28}.retry-card{width:min(92vw,350px)}
+@media(max-width:850px){.sack-activate{right:8px;top:auto;bottom:12px}}
+#tutorialGuide{
+  display:none;
+  position:fixed;
+  z-index:25;
+  top:14px;
+  left:50%;
+  width:min(92vw,470px);
+  transform:translateX(-50%);
+  padding:14px 18px;
+  border:4px solid var(--gold);
+  border-radius:14px;
+  color:var(--ink);
+  background:#fffdf2;
+  box-shadow:0 10px 24px rgba(48,36,16,.32);
+  font-weight:bold;
+  pointer-events:none;
+}
+#tutorialGuide.active{display:block}
+#doubleError{min-height:18px;margin:5px 0 0;color:#c92816;font-size:.82rem;font-weight:bold}
+.sack-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:10px 0}
+.sack-small{background:#a76c40}.sack-regular{background:#377cc9}.sack-large{background:#3e994d}.sack-massive{background:#c9483e}.sack-gargantuan{background:#7b51a8}
+#codesModal{z-index:14}
+#doubleModal.dark-flip{
+  background:rgba(0,0,0,.78);
+}
+.tutorial-card{
+  width:min(95vw,760px);
+  max-height:90vh;
+  overflow:auto;
+  text-align:left;
+  padding:20px;
+}
+.tutorial-intro{margin:0 0 14px;text-align:center;font-weight:bold}
+.tutorial-steps{display:grid;gap:10px}
+.tutorial-step{
+  position:relative;
+  padding:14px 16px 14px 66px;
+  border:3px solid #e1ac20;
+  border-radius:14px;
+  background:linear-gradient(135deg,#fffdf2,#ffeeb2);
+  box-shadow:0 5px 0 #d18b00;
+  font-size:1rem;
+  line-height:1.35;
+}
+.tutorial-step::before{
+  content:attr(data-step);
+  position:absolute;
+  left:15px;
+  top:50%;
+  transform:translateY(-50%);
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  background:var(--gold-dark);
+  font-weight:bold;
+}
+.tutorial-step:not(:last-child)::after{
+  content:"↓";
+  position:absolute;
+  left:50%;
+  bottom:-31px;
+  transform:translateX(-50%);
+  z-index:2;
+  color:#a96600;
+  font-size:32px;
+  line-height:24px;
+  text-shadow:0 1px #fff7d6;
+}
+.tutorial-step strong{display:block;color:#875500;font-size:1.12rem}
+.modal-card{
+  position:relative;
+  z-index:2;
+  width:min(94vw,390px);
+  padding:18px;
+  border:4px solid var(--gold);
+  border-radius:12px;
+  background:#fffdf2;
+  box-shadow:0 18px 40px rgba(48,36,16,.35);
+}
+.modal-card h2{
+  margin:0 0 8px;
+  color:var(--gold-dark);
+}
+.modal-card input{
+  width:min(100%,280px);
+  padding:10px;
+  border:2px solid #c7aa55;
+  border-radius:8px;
+  font:inherit;
+}
+#doubleModal .modal-card{
+  overflow:hidden;
+}
+#rareImageModal{z-index:20;background:transparent;pointer-events:none}
+.rare-image-card{
+  width:min(90vw,360px);
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  line-height:0;
+  pointer-events:none;
+  transform:rotate(9deg);
+  animation:factoryPop .95s ease-out both;
+}
+.rare-image-card img{display:block;width:100%;max-height:65vh;object-fit:contain;border:0;border-radius:0}
+@keyframes factoryPop{
+  0%{opacity:0;transform:translateY(-70px) rotate(9deg) scale(.78)}
+  14%,72%{opacity:1;transform:translateY(0) rotate(9deg) scale(1)}
+  100%{opacity:0;transform:translateY(20px) rotate(9deg) scale(.94)}
+}
+.pool-table{
+  position:relative;
+  overflow:hidden;
+  height:170px;
+  margin:12px 0;
+  border:8px solid #6b3d16;
+  border-radius:18px;
+  background:radial-gradient(circle at center,#22865b,#0f593b 72%);
+  box-shadow:inset 0 0 18px rgba(0,0,0,.35);
+}
+.black-hole{
+  position:fixed;
+  left:50%;
+  top:50%;
+  width:33vmax;
+  height:33vmax;
+  min-width:320px;
+  min-height:320px;
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  background:
+    radial-gradient(circle,#000 0 31%,#16001f 34% 43%,#46115c 44% 53%,rgba(0,0,0,0) 68%),
+    conic-gradient(from 0deg,#000,#341045,#050105,#5d177a,#000);
+  opacity:0;
+  filter:blur(.2px);
+  animation:blackHoleSpin 5s linear infinite, blackHoleDrift 4.8s ease-in-out infinite alternate;
+  transition:opacity .25s ease;
+  z-index:1;
+  pointer-events:none;
+}
+#doubleModal.active .black-hole{
+  opacity:.72;
+}
+#doubleModal.dark-flip .black-hole{
+  opacity:.95;
+}
+#flipCoin{
+  position:absolute;
+  left:calc(50% - 36px);
+  top:48px;
+  width:72px;
+  height:72px;
+  border-radius:50%;
+  border:4px solid #a96e00;
+  background:#ffd54f;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:36px;
+  box-shadow:0 8px 18px rgba(0,0,0,.35);
+  z-index:2;
+}
+#flipCoin.flipping{
+  animation:coinFlip 1.95s cubic-bezier(.18,.78,.18,1) both;
+}
+@keyframes coinFlip{
+  0%{transform:rotateY(0) translateY(0)}
+  16%{transform:rotateY(220deg) translateY(-34px)}
+  32%{transform:rotateY(500deg) translateY(-70px)}
+  50%{transform:rotateY(780deg) translateY(-96px)}
+  68%{transform:rotateY(1040deg) translateY(-62px)}
+  84%{transform:rotateY(1260deg) translateY(-24px)}
+  100%{transform:rotateY(1440deg) translateY(0)}
+}
+@keyframes blackHoleSpin{
+  to{transform:translate(-50%,-50%) rotate(360deg)}
+}
+@keyframes blackHoleDrift{
+  from{margin-left:-12px;margin-top:7px}
+  to{margin-left:14px;margin-top:-10px}
+}
+@media(max-width:880px){
+  .mini-slots{
+    position:static;
+    transform:none;
+    width:100%;
+    min-height:0;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-areas:"lt rt" "lb rb";
+    gap:8px;
+    margin:8px auto 14px;
+  }
+  .mini-grid{
+    width:100%;
+    min-height:0;
+  }
+  .mini-cell{font-size:clamp(14px,5vw,20px)}
+}
+</style>
+</head>
+<body>
+<div id="startModal" class="modal active" aria-live="polite">
+  <div class="modal-card start-card" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+    <h2 id="startTitle">🐔 Mr. Chicken<br>Slot Machine</h2>
+    <p id="startMessage">Complete the tutorial for a secret code!</p>
+    <button id="playBtn" onclick="showDifficultyOptions()">Play</button>
+    <button onclick="startTutorial()">Tutorial</button>
+    <div id="difficultyOptions" class="difficulty-options">
+      <button onclick="startGame('easy')">Easy</button>
+      <button onclick="startGame('normal')">Normal</button>
+      <button onclick="startGame('hard')">Hard</button>
+    </div>
+  </div>
+</div>
+<div id="tutorialGuide" aria-live="polite"></div>
+<div id="tutorialSackActivation" class="sack-activate"><b>Activate your sacks of coins!</b><div class="bag"></div><div class="bag-name">Small Sack — 10 coins</div><button onclick="activateTutorialSack()">Activate</button></div>
+<main>
+  <h1>🐔 Mr. Chicken Slot Machine</h1>
+  <section class="machine" aria-label="Slot machine">
+    <div class="grid" id="grid"></div>
+    <div class="mini-slots" id="miniSlots"></div>
+    <div class="spin-row">
+      <button id="spinBtn" onclick="trySpin()">SPIN (1 coin)</button>
+      <button id="spinModeBtn" onclick="toggleSpinMode()">3x Toggle</button>
+      <button id="audioBtn" onclick="toggleAudio()">Audio On</button>
+    </div>
+
+    <div id="stats"></div>
+    <div id="earned">💰 Earned: 0</div>
+    <div id="info"></div>
+
+    <div id="market" class="panel">
+      <span class="panel-title"><b>🏪 Market</b></span>
+      <button id="luckBtn" onclick="buyLuck()">🍀 Luck (25)</button>
+      <button id="multBtn" onclick="buyMult()">🔥 Multiplier (50)</button>
+      <button id="jackpotBtn" onclick="buyJackpot()">🎰 Jackpot Chance (40)</button>
+      <button id="sackBtn" onclick="openSackShop()">💼 Sacks of Coins</button>
+    </div>
+  </section>
+</main>
+
+<button id="sideMenu" onclick="openMenu()">Menu</button>
+<button id="darkCoin" aria-label="Double or nothing" onclick="openDoubleOrNothing()"></button>
+<div id="sickleOffer">
+  <div><b>🌾 Sickle appeared!</b></div>
+  <button onclick="buySickle()">Buy for 75%</button>
+</div>
+
+<div id="doubleModal" class="modal" aria-live="polite">
+  <div class="black-hole" aria-hidden="true"></div>
+  <div class="modal-card">
+    <h2>Double or Nothing</h2>
+    <p>Wager as many coins as you would like. If it lands on your side, your coins double. If it lands on the opposite side, you loose half your coins.</p>
+    <input id="doubleWager" type="number" min="2" step="2" value="2" aria-label="Coin wager">
+    <div id="doubleError" role="alert"></div>
+    <div class="pool-table">
+      <div id="flipCoin">🐔</div>
+    </div>
+    <button onclick="chooseDoubleOrNothing('heads')">Heads 🐔</button>
+    <button onclick="chooseDoubleOrNothing('tails')">Tails 🐤</button>
+    <button onclick="closeDoubleOrNothing()">Cancel</button>
+  </div>
+</div>
+
+<div id="sackModal" class="modal" aria-live="polite">
+  <div class="modal-card">
+    <h2>💼 Sacks of Coins</h2>
+    <p>Buy a sack now; it automatically opens when you cannot afford a spin.</p>
+    <div class="sack-options">
+      <button class="sack-small" onclick="buySack(10)">Small — 10 coins</button>
+      <button class="sack-regular" onclick="buySack(100)">Regular — 100 coins</button>
+      <button class="sack-large" onclick="buySack(1000)">Large — 1,000 coins</button>
+      <button class="sack-massive" onclick="buySack(10000)">Massive — 10,000 coins</button>
+      <button class="sack-gargantuan" onclick="buySack(100000)">Gargantuan — 100,000 coins</button>
+    </div>
+    <button onclick="closeSackShop()">Close</button>
+  </div>
+</div>
+
+<div id="codesModal" class="modal" aria-live="polite">
+  <div class="modal-card">
+    <h2>Codes</h2>
+    <input id="codeInput" placeholder="Enter code">
+    <br>
+    <button onclick="submitCode()">Submit</button>
+    <button onclick="closeCodes()">Close</button>
+  </div>
+</div>
+
+<div id="menuModal" class="modal" aria-live="polite">
+  <div class="modal-card">
+    <h2>Menu</h2>
+    <button onclick="toggleAudio()" id="menuAudioBtn">Audio On</button>
+    <button onclick="openHelp()">How It Works</button>
+    <button onclick="openPatternsMenu()">Patterns Menu</button>
+    <button onclick="openCodes()">Codes</button>
+    <button onclick="closeMenu()">Close</button>
+  </div>
+</div>
+
+<div id="retryModal" class="modal" aria-live="polite">
+  <div class="modal-card retry-card"><h2>Try again</h2><p id="retryHint"></p><button onclick="closeRetryModal()">Okay</button></div>
+</div>
+
+<div id="helpModal" class="modal" aria-live="polite">
+  <div class="modal-card tutorial-card" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+    <h2 id="tutorialTitle">🐝 How It Works</h2>
+    <p class="tutorial-intro">Follow the big arrows — every spin can build your chicken fortune!</p>
+    <div class="tutorial-steps">
+      <article class="tutorial-step" data-step="1"><strong>Spin the 5 × 3 machine</strong>Press <b>SPIN</b> to spend coins and fill the 3 rows of 5 symbols. Use the 3× toggle for three boards at once.</article>
+      <article class="tutorial-step" data-step="2"><strong>Make patterns to win</strong>Matching symbols pay on horizontal rows, vertical columns, zig/zag lines, the X, and the Border. Each winning pattern glows by itself before all of your wins are shown together.</article>
+      <article class="tutorial-step" data-step="3"><strong>Keep a winning streak</strong>Wins raise your streak multiplier (up to ×5). Miss a spin and the streak resets, so keep the good rolls going.</article>
+      <article class="tutorial-step" data-step="4"><strong>Visit the Market</strong>Spend coins on Luck, Multiplier, Jackpot Chance, and Coin Sacks. Upgrades make future spins more rewarding or help you recover.</article>
+      <article class="tutorial-step" data-step="5"><strong>Choose a mode</strong>Easy always costs 1 coin per spin and pays 1.1× coins. Normal raises spin price after every two upgrades. Hard raises it after the first upgrade and every upgrade after, but pays 0.9× coins.</article>
+      <article class="tutorial-step" data-step="6"><strong>Use the extra controls</strong>Open <b>Menu</b> for Codes, audio, and this guide. The dark coin starts Double or Nothing; choose chicken or chick before it lands.</article>
+    </div>
+    <button onclick="closeHelp()">Close</button>
+  </div>
+</div>
+
+<div id="patternsModal" class="modal" aria-live="polite">
+  <div class="modal-card patterns-card" role="dialog" aria-modal="true">
+    <h2>Patterns Menu</h2>
+    <p>Each number is the base number of <b>coins earned</b>. Your Shop and Streak multipliers apply after it.</p>
+    <div id="patternGallery" class="pattern-gallery"></div>
+    <button onclick="closePatternsMenu()">Close</button>
+  </div>
+</div>
+
+<div id="rareImageModal" class="modal" aria-live="polite">
+  <div class="modal-card rare-image-card" role="dialog" aria-modal="true">
+    <img src="factory-no-good.png" alt="Homework, stack it up, pop quiz, man what">
+  </div>
+</div>
+
+<script>
+let coins=30,shopMult=1,streakMult=1,luck=0,jackpotLevel=0,spinning=false,guaranteedJackpot=false;
+let sackInventory={10:0,100:0,1000:0,10000:0,100000:0};
+let spinBatch=1,audioOn=true,sickleRolls=0,infiniteCoins=false,doubleChoice=null,sickleOfferActive=false,sickleOfferTimer=null;
+let completedSpinCount=0,factoryMode=false;
+let spinPriceUpgradeCount=0,rareEventTimer=null,tutorialActive=false,tutorialStep=0,tutorialCodeRedeemed=false,tutorialLossSpins=0,tutorialMenuClicks=new Set();
+let difficulty="normal",nextGambleHint=10+Math.floor(Math.random()*11),gambleHintPending=false;
+let luckyDuckyRedeemed=false,homeTipTimer=null,homeTipIndex=0;
+const masterVolume=1.1;
+const baseLuckChance=.03;
+const symbols=["🐔","🐦","🌽","🚜","🌾","💧"];
+const symbolPayouts=Object.fromEntries(symbols.map(symbol=>[symbol,0]));
+const grid=document.getElementById("grid");
+const miniSlots=document.getElementById("miniSlots");
+
+const patternGuide=[
+  ["1 by 3",[6,7,8],3], ["1 by 4",[5,6,7,8],6], ["1 by 5",[5,6,7,8,9],9],
+  ["X",[1,3,7,11,13],12], ["Zig",[0,6,12,8,4],15], ["Zag",[10,6,2,8,14],15],
+  ["Border",[0,1,2,3,4,5,9,10,11,12,13,14],18], ["Jackpot",[...Array(15).keys()],30]
+];
+
+function openPatternsMenu(){
+  trackTutorialMenu("patterns");
+  const gallery=document.getElementById("patternGallery");
+  gallery.innerHTML=patternGuide.map(([name,indices,payout])=>{
+    const cells=Array.from({length:15},(_,i)=>`<span class="${indices.includes(i)?"on":""}"></span>`).join("");
+    return `<article class="pattern-tile"><strong>${name}</strong><div class="pattern-mini">${cells}</div><div class="pattern-payout">${payout}× base coins</div></article>`;
+  }).join("");
+  document.getElementById("patternsModal").classList.add("active");
+}
+
+function closePatternsMenu(){
+  document.getElementById("patternsModal").classList.remove("active");
+}
+
+for(let i=0;i<15;i++){
+  const d=document.createElement("div");
+  d.className="cell";
+  d.textContent="❔";
+  grid.appendChild(d);
+}
+
+const miniBoards=[];
+for(let b=0;b<4;b++){
+  const board=document.createElement("div");
+  board.className="mini-grid";
+  const cells=[];
+  for(let i=0;i<15;i++){
+    const d=document.createElement("div");
+    d.className="mini-cell";
+    d.textContent="❔";
+    board.appendChild(d);
+    cells.push(d);
+  }
+  miniSlots.appendChild(board);
+  miniBoards.push(cells);
+}
+
+function beep(freq,dur){
+  if(!audioOn) return;
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ctx.createOscillator();
+    const g=ctx.createGain();
+    o.frequency.value=freq;
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start();
+    g.gain.setValueAtTime(0.08*masterVolume,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+dur);
+    o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+
+function playTone(ctx,freq,start,dur,type="sine",volume=0.08){
+  if(!audioOn) return;
+  const o=ctx.createOscillator();
+  const g=ctx.createGain();
+  o.type=type;
+  o.frequency.setValueAtTime(freq,start);
+  g.gain.setValueAtTime(0.0001,start);
+  g.gain.exponentialRampToValueAtTime(volume*masterVolume,start+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(start);
+  o.stop(start+dur+0.03);
+}
+
+function playJackpotBuild(){
+  if(!audioOn) return;
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const now=ctx.currentTime;
+    const notes=[220,277,330,415,554,660,831,988];
+
+    for(let i=0;i<22;i++){
+      const start=now+i*0.125;
+      const freq=notes[i%notes.length]*(i>15?1.5:1);
+      playTone(ctx,freq,start,0.09,i%2?"square":"triangle",0.045+i*0.002);
+      if(i%4===0) playTone(ctx,110,start,0.06,"sawtooth",0.035);
+    }
+
+    const riser=ctx.createOscillator();
+    const gain=ctx.createGain();
+    riser.type="sawtooth";
+    riser.frequency.setValueAtTime(180,now);
+    riser.frequency.exponentialRampToValueAtTime(1200,now+2.75);
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.exponentialRampToValueAtTime(0.055,now+0.2);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+2.78);
+    riser.connect(gain);
+    gain.connect(ctx.destination);
+    riser.start(now);
+    riser.stop(now+2.8);
+  }catch(e){}
+}
+
+function playJackpotDrop(){
+  if(!audioOn) return;
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const now=ctx.currentTime;
+    playTone(ctx,82,now,0.5,"sawtooth",0.16);
+    playTone(ctx,164,now,0.32,"square",0.11);
+    playTone(ctx,659,now+0.02,0.18,"triangle",0.12);
+    playTone(ctx,988,now+0.12,0.16,"triangle",0.09);
+    playTone(ctx,1318,now+0.24,0.22,"triangle",0.08);
+    playTone(ctx,55,now+0.28,0.35,"sine",0.14);
+    playJackpotLadder();
+  }catch(e){}
+}
+
+function playJackpotSoundtrack(){
+  playJackpotBuild();
+  setTimeout(playJackpotDrop,4800);
+}
+
+function playDarkFlipMusic(){
+  if(!audioOn) return;
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const now=ctx.currentTime;
+    [73,65,58,49,55,41].forEach((freq,i)=>{
+      playTone(ctx,freq,now+i*0.28,0.32,i%2?"sawtooth":"sine",0.06);
+      playTone(ctx,freq*2,now+i*0.28+0.08,0.2,"triangle",0.025);
+    });
+  }catch(e){}
+}
+
+function playPatternSound(pattern,index){
+  beep(420+pattern.amount*18+index*30,0.11);
+}
+
+function playJackpotLadder(){
+  [420,480,540,610,690,780,890,1010,1160,1320,1500,1700,1920,2160,2440].forEach((freq,i)=>{
+    setTimeout(()=>beep(freq,0.06),i*45);
+  });
+}
+
+function playVineBoom(){
+  if(!audioOn) return;
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const now=ctx.currentTime;
+    const o=ctx.createOscillator();
+    const g=ctx.createGain();
+    o.type="sawtooth";
+    o.frequency.setValueAtTime(125,now);
+    o.frequency.exponentialRampToValueAtTime(42,now+.42);
+    g.gain.setValueAtTime(.0001,now);
+    g.gain.exponentialRampToValueAtTime(.24*masterVolume,now+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,now+.48);
+    o.connect(g);g.connect(ctx.destination);o.start(now);o.stop(now+.5);
+  }catch(e){}
+}
+
+function scaledCost(base,level,growth){
+  return Math.ceil((base*Math.pow(growth,level))/5)*5;
+}
+
+function luckCost(){ return scaledCost(25,luck,1.485); }
+function multCost(){ return scaledCost(50,shopMult-1,2.025); }
+function jackpotCost(){ return scaledCost(40,jackpotLevel,1.62); }
+function sickleCost(){ return Math.max(1,Math.round(coins*0.75)); }
+function spinCost(){
+  if(difficulty==="easy") return 1;
+  if(difficulty==="hard") return 1+Math.max(0,spinPriceUpgradeCount-1);
+  return 1+Math.floor(spinPriceUpgradeCount/2);
+}
+
+function coinGainMultiplier(){
+  return difficulty==="easy"?1.1:difficulty==="hard"?.9:1;
+}
+
+function applyCoinMode(amount){
+  return Math.round(amount*coinGainMultiplier());
+}
+
+function randomSymbol(luckySymbol){
+  const luckyChance=Math.min(0.48,baseLuckChance+luck*0.035);
+  if(luckySymbol&&Math.random()<luckyChance) return luckySymbol;
+  return symbols[Math.floor(Math.random()*symbols.length)];
+}
+
+function createSpinBoard(luckySymbol){
+  const board=Array.from({length:15},()=>randomSymbol(luckySymbol));
+  // A small boost occasionally plants one memorable special pattern.
+  if(Math.random()<.14){
+    const specialPatterns=[
+      [0,6,12,8,4], // zig
+      [10,6,2,8,14], // zag
+      [1,3,7,11,13], // X
+      [0,1,2,3,4,5,9,10,11,12,13,14] // border
+    ];
+    const special=specialPatterns[Math.floor(Math.random()*specialPatterns.length)];
+    const specialSymbol=Math.random()<.55?luckySymbol:symbols[Math.floor(Math.random()*symbols.length)];
+    special.forEach(index=>board[index]=specialSymbol);
+  }
+  return board;
+}
+
+function createTutorialBoard(){
+  const board=["🐦","🌽","🚜","🌾","💧","🌾","🐔","🐔","🐔","🚜","💧","🌾","🐦","🌽","🚜"];
+  // The exact same opening win every time: three chickens across the middle.
+  [6,7,8].forEach(index=>board[index]="🐔");
+  return board;
+}
+
+function createTutorialLossBoard(){
+  return ["🐦","🌽","🚜","🌾","💧","🌾","🐦","🌽","🚜","💧","🚜","💧","🌾","🐦","🌽"];
+}
+
+function spend(cost){
+  if(infiniteCoins) return true;
+  if(coins<cost) return false;
+  coins-=cost;
+  return true;
+}
+
+function hasSacks(){
+  return Object.values(sackInventory).some(count=>count>0);
+}
+
+function sackSummary(){
+  const items=Object.entries(sackInventory)
+    .filter(([,count])=>count>0)
+    .map(([amount,count])=>`${count}×${Number(amount).toLocaleString()}`);
+  return items.length?items.join(", "):"none";
+}
+
+function checkSacks(required=1){
+  if(infiniteCoins||coins>=required||!hasSacks()) return false;
+  const sizes=Object.keys(sackInventory).map(Number).filter(size=>sackInventory[size]>0).sort((a,b)=>a-b);
+  const rescue=sizes.find(size=>coins+size>=required)||sizes[sizes.length-1];
+  sackInventory[rescue]--;
+  coins+=rescue;
+  document.getElementById("info").textContent=`A ${rescue.toLocaleString()}-coin sack rescued you!`;
+  document.getElementById("earned").textContent="💰 Earned: "+rescue;
+  beep(620,0.18);
+  return true;
+}
+
+function update(){
+  const coinText=infiniteCoins?"Infinity":coins;
+  document.getElementById("stats").textContent=`Mode: ${difficulty} | Coins: ${coinText} | Mult: x${shopMult} | Streak: x${streakMult} | Luck: ${luck} | Jackpot: ${Math.round((0.015+jackpotLevel*0.005)*100)}% | Sacks: ${sackSummary()} | Sickle: ${sickleRolls}`;
+  const cost=spinCost();
+  document.getElementById("spinBtn").textContent=spinBatch>1?`SPIN ${spinBatch}x (${cost} coin${cost===1?"":"s"} each)`:`SPIN (${cost} coin${cost===1?"":"s"})`;
+  const modeButton=document.getElementById("spinModeBtn");
+  modeButton.hidden=false;
+  modeButton.textContent=spinBatch===1?"3x Toggle":"1x Toggle";
+  document.getElementById("audioBtn").textContent=audioOn?"Audio On":"Audio Off";
+  document.getElementById("menuAudioBtn").textContent=audioOn?"Audio On":"Audio Off";
+  miniSlots.classList.toggle("active",spinBatch>1);
+  miniBoards.forEach((cells,index)=>cells[0].parentElement.classList.toggle("hidden",index>=spinBatch-1));
+  document.getElementById("spinBtn").disabled=spinning;
+  document.getElementById("luckBtn").textContent=`🍀 Luck (${luckCost()})`;
+  document.getElementById("multBtn").textContent=`🔥 Multiplier (${multCost()})`;
+  document.getElementById("jackpotBtn").textContent=`🎰 Jackpot Chance (${jackpotCost()})`;
+  document.getElementById("luckBtn").disabled=spinning||(!infiniteCoins&&coins<luckCost());
+  document.getElementById("multBtn").disabled=spinning||(!infiniteCoins&&coins<multCost());
+  document.getElementById("jackpotBtn").disabled=spinning||(!infiniteCoins&&coins<jackpotCost());
+  document.getElementById("sackBtn").disabled=spinning;
+}
+
+function showDifficultyOptions(){
+  document.getElementById("difficultyOptions").classList.add("active");
+  document.getElementById("playBtn").hidden=true;
+  document.getElementById("startTitle").textContent="Pick a mode";
+  document.getElementById("startTitle").style.fontSize="clamp(1.7rem,6vw,2.4rem)";
+  beep(660,.12);
+}
+
+function startGame(selectedDifficulty="regular"){
+  difficulty=selectedDifficulty;
+  document.getElementById("startModal").classList.remove("active");
+  document.getElementById("tutorialGuide").classList.remove("active");
+  document.getElementById("difficultyOptions").classList.remove("active");
+  document.getElementById("playBtn").hidden=false;
+  document.getElementById("startTitle").innerHTML="🐔 Mr. Chicken<br>Slot Machine";
+  document.getElementById("startTitle").style.fontSize="";
+  document.getElementById("startMessage").textContent="Complete the tutorial for a secret code!";
+  update();
+}
+
+const homeTips=["Complete the tutorial for a secret code!","Running out of coins? Try Double or Nothing from the bottom left.","Luck, Multiplier, and Jackpot Chance make each run stronger.","Keep a Sack of Coins ready so you can keep spinning."];
+function rotateHomeTip(){
+  if(!document.getElementById("startModal").classList.contains("active")) return;
+  homeTipIndex=(homeTipIndex+1)%homeTips.length;
+  document.getElementById("startMessage").textContent=homeTips[homeTipIndex];
+}
+
+function resetGameState(){
+  coins=30; shopMult=1; streakMult=1; luck=0; jackpotLevel=0; spinning=false;
+  guaranteedJackpot=false; sackInventory={10:0,100:0,1000:0,10000:0,100000:0};
+  spinBatch=1; sickleRolls=0; infiniteCoins=false; doubleChoice=null; completedSpinCount=0;
+  spinPriceUpgradeCount=0; tutorialCodeRedeemed=false; tutorialLossSpins=0; tutorialMenuClicks=new Set(); luckyDuckyRedeemed=false; gambleHintPending=false;
+  document.getElementById("tutorialSackActivation").classList.remove("active");
+  nextGambleHint=10+Math.floor(Math.random()*11);
+  hideSickleOffer();
+  clearWin();
+  document.querySelectorAll(".cell,.mini-cell").forEach(cell=>cell.textContent="❔");
+  document.getElementById("earned").textContent="💰 Earned: 0";
+  document.getElementById("info").textContent="";
+  update();
+}
+
+function setTutorialMessage(message){
+  const guide=document.getElementById("tutorialGuide");
+  guide.textContent=message;
+  guide.classList.add("active");
+}
+
+function startTutorial(){
+  resetGameState();
+  startGame("normal");
+  tutorialActive=true;
+  tutorialStep=0;
+  setTutorialMessage("Tutorial — Step 1: Press SPIN to play your first round.");
+}
+
+function advanceTutorialAfterSpin(){
+  if(!tutorialActive||tutorialStep!==0) return;
+  tutorialStep=1;
+  setTutorialMessage("Tutorial — Step 2: Buy Luck, Multiplier, or Jackpot Chance from the Market.");
+}
+
+function completeTutorialUpgrade(){
+  if(!tutorialActive||tutorialStep!==1) return;
+  tutorialStep=2;
+  setTutorialMessage("Tutorial — Step 3: Try Double or Nothing using the dark coin in the corner.");
+}
+
+function advanceTutorialAfterFlip(){
+  if(!tutorialActive||tutorialStep!==2) return;
+  tutorialStep=3;
+  setTutorialMessage("Tutorial — Step 4: Open Menu → Codes and enter Tutorial for a free Multiplier upgrade.");
+}
+
+function trackTutorialMenu(item){
+  if(!tutorialActive||tutorialStep!==3) return;
+  tutorialMenuClicks.add(item);
+  if(["audio","help","patterns"].every(item=>tutorialMenuClicks.has(item))){
+    startTutorialSackStep();
+  }else{
+    setTutorialMessage("Tutorial — Step 5: Check the rest of Menu: Audio, How It Works, and Patterns Menu.");
+  }
+}
+
+function startTutorialSackStep(){
+  tutorialStep=4;
+  coins=12;
+  update();
+  setTutorialMessage("Tutorial — Step 5: Think you're gonna run out of coins? Buy a Small Sack of Coins!");
+}
+
+function advanceTutorialLossSpin(){
+  if(!tutorialActive||tutorialStep!==5) return;
+  tutorialLossSpins++;
+  if(tutorialLossSpins===2){
+    tutorialStep=6;
+    setTutorialMessage("Activate your sacks of coins!");
+    document.getElementById("tutorialSackActivation").classList.add("active");
+  }
+}
+
+function activateTutorialSack(){
+  if(!tutorialActive||tutorialStep!==6) return;
+  sackInventory[10]--;
+  coins+=10;
+  document.getElementById("tutorialSackActivation").classList.remove("active");
+  setTutorialMessage("Tutorial complete! Forgot something? Check the menu!");
+  setTimeout(finishTutorial,900);
+}
+
+function finishTutorial(){
+  tutorialActive=false;
+  document.getElementById("tutorialGuide").classList.remove("active");
+  closeMenu();
+  closeCodes();
+  resetGameState();
+  document.getElementById("startMessage").textContent="Tutorial complete! Forgot something? Check the menu!";
+  document.getElementById("startModal").classList.add("active");
+}
+
+function maybeShowSickleOffer(){
+  if(sickleOfferActive||spinning||infiniteCoins) return;
+  if(Math.random()>=0.03) return;
+  sickleOfferActive=true;
+  const offer=document.getElementById("sickleOffer");
+  offer.classList.add("active");
+  clearTimeout(sickleOfferTimer);
+  sickleOfferTimer=setTimeout(hideSickleOffer,10000);
+}
+
+function hideSickleOffer(){
+  sickleOfferActive=false;
+  document.getElementById("sickleOffer").classList.remove("active");
+  clearTimeout(sickleOfferTimer);
+  sickleOfferTimer=null;
+}
+
+function clearWin(){
+  grid.classList.remove("jackpot-mode");
+  document.getElementById("info").classList.remove("jackpot-text");
+  document.querySelectorAll(".cell").forEach(c=>c.classList.remove("win","locked","suspense","final-focus","jackpot-pop"));
+  document.querySelectorAll(".mini-cell").forEach(c=>c.classList.remove("win"));
+}
+
+function patternAmount(pattern){
+  return pattern.multiplier*shopMult*streakMult;
+}
+
+function findPatterns(board){
+  const patterns=[];
+
+  function add(idxs,multiplier,name){
+    const symbol=board[idxs[0]];
+    patterns.push({idxs,multiplier,symbol,name});
+  }
+
+  // Border: every outer square matches. The centre square is intentionally
+  // excluded, so this is a true frame rather than the old "eye" pattern.
+  const borderIdxs=[0,1,2,3,4,5,9,10,11,12,13,14];
+  if(borderIdxs.every(i=>board[i]===board[0])){
+    add(borderIdxs,18,"border");
+  }
+
+  // Conventional 5-column zig: top → middle → bottom → middle → top.
+  const zigIdxs=[0,6,12,8,4];
+  if(zigIdxs.every(i=>board[i]===board[zigIdxs[0]])){
+    add(zigIdxs,15,"zig");
+  }
+
+  // Conventional 5-column zag: bottom → middle → top → middle → bottom.
+  const zagIdxs=[10,6,2,8,14];
+  if(zagIdxs.every(i=>board[i]===board[zagIdxs[0]])){
+    add(zagIdxs,15,"zag");
+  }
+
+  // X from the supplied sketch: the two upper/lower inner squares plus centre.
+  // It is evaluated before the 1-by-5 row patterns.
+  const xIdxs=[1,3,7,11,13];
+  if(xIdxs.every(i=>board[i]===board[xIdxs[0]])) add(xIdxs,12,"X");
+
+  for(let r=0;r<3;r++){
+    const b=r*5;
+    if(board[b]===board[b+1]&&board[b]===board[b+2]&&board[b]===board[b+3]&&board[b]===board[b+4]){
+      add([b,b+1,b+2,b+3,b+4],9,"1 by 5");
+    }else{
+      const leftFour=board[b]===board[b+1]&&board[b]===board[b+2]&&board[b]===board[b+3];
+      const rightFour=board[b+1]===board[b+2]&&board[b+1]===board[b+3]&&board[b+1]===board[b+4];
+      if(leftFour) add([b,b+1,b+2,b+3],6,"1 by 4");
+      else if(rightFour) add([b+1,b+2,b+3,b+4],6,"1 by 4");
+      else{
+        for(let start=0;start<=2;start++){
+          const i=b+start;
+          if(board[i]===board[i+1]&&board[i]===board[i+2]) add([i,i+1,i+2],3,"1 by 3");
+        }
+      }
+    }
+  }
+
+  for(let c=0;c<5;c++){
+    if(board[c]===board[c+5]&&board[c]===board[c+10]) add([c,c+5,c+10],3,"1 by 3");
+  }
+
+  // Every diagonal is its own pattern, including the two that cross through X.
+  [[0,6,12],[1,7,13],[2,8,14],[2,6,10],[3,7,11],[4,8,12]].forEach(idxs=>{
+    if(idxs.every(index=>board[index]===board[idxs[0]])) add(idxs,3,"diagonal");
+  });
+
+  if(board.every(symbol=>symbol===board[0])){
+    add([...Array(15).keys()],30,"jackpot");
+  }
+
+  patterns.forEach(pattern=>pattern.amount=patternAmount(pattern));
+  patterns.sort((a,b)=>a.multiplier-b.multiplier);
+  return patterns;
+}
+
+function findJackpotPatterns(board){
+  const symbol=board[0];
+  const add=(idxs,multiplier,name)=>({idxs,multiplier,symbol,name,amount:multiplier*shopMult*streakMult});
+  // Jackpot-only order. Individual diagonals are omitted because all six are
+  // pieces of the Zig, Zag, or X patterns that follow.
+  return [
+    add([1,6,11],3,"3 by 1"),
+    add([2,7,12],3,"3 by 1"),
+    add([3,8,13],3,"3 by 1"),
+    add([5,6,7,8,9],9,"1 by 5"),
+    add([1,3,7,11,13],12,"X"),
+    add([0,6,12,8,4],15,"zig"),
+    add([10,6,2,8,14],15,"zag"),
+    add([0,1,2,3,4,5,9,10,11,12,13,14],18,"border"),
+    add([...Array(15).keys()],30,"jackpot")
+  ];
+}
+
+function evaluateBoard(board,cells,animate=false){
+  const patterns=findPatterns(board);
+  const reward=patterns.reduce((sum,pattern)=>sum+pattern.amount,0);
+  if(!animate){
+    patterns.forEach(pattern=>pattern.idxs.forEach(i=>cells[i].classList.add("win")));
+  }
+  return {reward,patterns};
+}
+
+function animatePatterns(patterns,cells,done){
+  if(patterns.length===0){
+    done();
+    return;
+  }
+  const cellList=Array.from(cells);
+  let index=0;
+  function step(){
+    cellList.forEach(cell=>cell.classList.remove("win"));
+    const pattern=patterns[index];
+    pattern.idxs.forEach(i=>cells[i].classList.add("win"));
+    playPatternSound(pattern,index);
+    document.getElementById("info").textContent=`${pattern.name} x${pattern.multiplier}: +${pattern.amount}`;
+    index++;
+    if(index<patterns.length){
+      setTimeout(step,520);
+    }else{
+      setTimeout(()=>{
+        patterns.forEach(pattern=>pattern.idxs.forEach(i=>cells[i].classList.add("win")));
+        done();
+      },320);
+    }
+  }
+  step();
+}
+
+function jackpotReward(cells,jackpotSymbol){
+  document.querySelectorAll(".cell").forEach(c=>c.classList.add("win"));
+  beep(900,0.45);
+  return (75+symbolPayouts[jackpotSymbol])*shopMult*streakMult;
+}
+
+function playJackpotAnimation(cells,jackpotSymbol,done){
+  grid.classList.add("jackpot-mode");
+  document.getElementById("info").classList.add("jackpot-text");
+  document.getElementById("info").textContent="";
+  document.querySelectorAll(".cell").forEach(c=>c.classList.remove("win","locked","suspense","final-focus","jackpot-pop"));
+
+  for(let r=0;r<3;r++){
+    for(let c=0;c<4;c++){
+      const lockedCell=cells[r*5+c];
+      lockedCell.textContent=jackpotSymbol;
+      lockedCell.classList.add("locked");
+    }
+  }
+
+  for(let r=0;r<3;r++){
+    cells[r*5+4].classList.add("suspense");
+  }
+
+  let suspense=0;
+  function finalColumnTick(){
+    const spinningRows=suspense<8?[0,1,2]:suspense<16?[1,2]:[2];
+    spinningRows.forEach(r=>{
+      cells[r*5+4].textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    });
+    if(suspense>=16){
+      cells[14].classList.add("final-focus");
+    }
+    suspense++;
+
+    if(suspense===8){
+      const firstCell=cells[4];
+      firstCell.textContent=jackpotSymbol;
+      firstCell.classList.remove("suspense");
+      firstCell.classList.add("locked","jackpot-pop");
+      beep(520,0.1);
+    }
+
+    if(suspense===16){
+      const secondCell=cells[9];
+      secondCell.textContent=jackpotSymbol;
+      secondCell.classList.remove("suspense");
+      secondCell.classList.add("locked","jackpot-pop");
+      cells[14].classList.add("final-focus");
+      beep(640,0.12);
+    }
+
+    if(suspense>27){
+      for(let r=0;r<3;r++){
+        const finalCell=cells[r*5+4];
+        finalCell.textContent=jackpotSymbol;
+        finalCell.classList.remove("suspense","final-focus");
+        finalCell.classList.add("jackpot-pop");
+      }
+      jackpotReward(cells,jackpotSymbol);
+      done();
+      setTimeout(()=>{
+        grid.classList.remove("jackpot-mode");
+        document.getElementById("info").classList.remove("jackpot-text");
+        document.querySelectorAll(".cell").forEach(c=>c.classList.remove("locked","final-focus","jackpot-pop"));
+      },1800);
+    }else{
+      const slowPhase=Math.max(0,suspense-16);
+      const nextDelay=70+Math.pow(slowPhase/11,2)*135;
+      setTimeout(finalColumnTick,nextDelay);
+    }
+  }
+  finalColumnTick();
+}
+
+function finishSpin(reward,message){
+  const usedMult=shopMult*streakMult;
+  if(sickleRolls>0&&reward>0){
+    reward*=2;
+    sickleRolls--;
+    message=(message||`WIN! Mult x${usedMult}`)+" | Sickle x2";
+  }else if(sickleRolls>0){
+    sickleRolls--;
+  }
+
+  if(reward>0){
+    streakMult=Math.min(streakMult+1,5);
+    beep(700,0.2);
+    document.getElementById("info").textContent=message||`WIN! Mult x${usedMult}`;
+  }else{
+    streakMult=1;
+    document.getElementById("info").textContent="No win";
+  }
+
+  reward=applyCoinMode(reward);
+  if(!infiniteCoins) coins+=reward;
+  spinning=false;
+  document.getElementById("earned").textContent="💰 Earned: "+reward;
+  if(!(tutorialActive&&tutorialStep===5)) checkSacks();
+  update();
+  advanceTutorialAfterSpin();
+  advanceTutorialLossSpin();
+  if(gambleHintPending){
+    document.getElementById("info").textContent="Wanna gamble your coins? Click the bottom left.";
+    gambleHintPending=false;
+  }
+  maybeShowSickleOffer();
+}
+
+function trySpin(){
+  const required=spinCost()*spinBatch;
+  if(!spinning&&!infiniteCoins&&coins<required&&!hasSacks()){
+    const hints=["Buy a Sack of Coins in the Market.","Use code \"Lucky Ducky\" for a free Luck upgrade.","Try Double or Nothing from the bottom-left coin."];
+    document.getElementById("retryHint").textContent=hints[Math.floor(Math.random()*hints.length)];
+    document.getElementById("retryModal").classList.add("active");
+    return;
+  }
+  spin();
+}
+
+function closeRetryModal(){
+  document.getElementById("retryModal").classList.remove("active");
+}
+
+function spin(){
+  if(spinBatch>1&&!guaranteedJackpot){
+    spinFive();
+    return;
+  }
+  const cost=spinCost();
+  if(!(tutorialActive&&tutorialStep===5)) checkSacks(cost);
+  if((!infiniteCoins&&coins<cost)||spinning) return;
+  spinning=true;
+  if(!infiniteCoins) coins-=cost;
+  registerSpin();
+  clearWin();
+  beep(300,0.08);
+  update();
+
+  const cells=document.getElementsByClassName("cell");
+  const luckySymbol=symbols[Math.floor(Math.random()*symbols.length)];
+  const isJackpot=guaranteedJackpot||Math.random()<(0.015+jackpotLevel*0.005);
+  guaranteedJackpot=false;
+  let t=0;
+
+  const anim=setInterval(()=>{
+    for(let i=0;i<15;i++){
+      cells[i].textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    }
+    t++;
+    if(t>15){
+      clearInterval(anim);
+
+      if(isJackpot){
+        const jackpotSymbol=symbols[Math.floor(Math.random()*symbols.length)];
+        const board=Array(15).fill(jackpotSymbol);
+        for(let i=0;i<15;i++){
+          cells[i].textContent=jackpotSymbol;
+        }
+        const jackpotPatterns=findJackpotPatterns(board);
+        const regularPatterns=jackpotPatterns.filter(pattern=>pattern.name!=="jackpot");
+        const result={
+          patterns:jackpotPatterns,
+          reward:jackpotPatterns.reduce((sum,pattern)=>sum+pattern.amount,0)
+        };
+        animatePatterns(regularPatterns,cells,()=>{
+          // Wait until every normal pattern has been shown before the jackpot music.
+          playJackpotSoundtrack();
+          playJackpotAnimation(cells,jackpotSymbol,()=>{
+            finishSpin(result.reward,`JACKPOT! ${jackpotSymbol} Mult x${shopMult*streakMult}`);
+          });
+        });
+        return;
+      }
+
+      const board=tutorialActive&&tutorialStep===0?createTutorialBoard():tutorialActive&&tutorialStep===5?createTutorialLossBoard():createSpinBoard(luckySymbol);
+      for(let i=0;i<15;i++) cells[i].textContent=board[i];
+
+      const result=evaluateBoard(board,cells,true);
+      const luckyText=luck>0?` | Lucky ${luckySymbol}`:"";
+      animatePatterns(result.patterns,cells,()=>{
+        finishSpin(result.reward,result.reward>0?`WIN! Mult x${shopMult*streakMult}${luckyText}`:null);
+      });
+    }
+  },55);
+}
+
+function spinMiniBoard(cells){
+  return new Promise(resolve=>{
+    const luckySymbol=symbols[Math.floor(Math.random()*symbols.length)];
+    let t=0;
+    cells.forEach(c=>c.classList.remove("win"));
+    const anim=setInterval(()=>{
+      cells.forEach(cell=>{
+        cell.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+      });
+      t++;
+      if(t>16){
+        clearInterval(anim);
+        const board=createSpinBoard(luckySymbol);
+        for(let i=0;i<15;i++) cells[i].textContent=board[i];
+        resolve(evaluateBoard(board,cells).reward);
+      }
+    },50);
+  });
+}
+
+function spinFive(){
+  const cost=spinCost()*spinBatch;
+  checkSacks(cost);
+  if(spinning||(!infiniteCoins&&coins<cost)) return;
+  spinning=true;
+  clearWin();
+  if(!infiniteCoins) coins-=cost;
+  // A 5× press is one player spin event for the rare Factory popup.
+  registerSpin();
+  beep(340,0.1);
+  update();
+
+  const mainCells=Array.from(document.getElementsByClassName("cell"));
+  Promise.all([spinMiniBoard(mainCells),...miniBoards.slice(0,spinBatch-1).map(cells=>spinMiniBoard(cells))]).then(rewards=>{
+    let total=rewards.reduce((sum,val)=>sum+val,0);
+    let message=total>0?`${spinBatch}x spin won ${total}`:`${spinBatch}x spin: no win`;
+    if(sickleRolls>0){
+      if(total>0){
+        total*=2;
+        message=`${spinBatch}x spin won ${total} | Sickle x2`;
+      }
+      sickleRolls--;
+    }
+    if(total>0){
+      streakMult=Math.min(streakMult+1,5);
+      document.getElementById("info").textContent=message;
+      beep(740,0.18);
+    }else{
+      streakMult=1;
+      document.getElementById("info").textContent=message;
+    }
+    total=applyCoinMode(total);
+    if(!infiniteCoins) coins+=total;
+    spinning=false;
+    document.getElementById("earned").textContent="💰 Earned: "+total;
+    checkSacks();
+    update();
+    advanceTutorialAfterSpin();
+    if(gambleHintPending){
+      document.getElementById("info").textContent="Wanna gamble your coins? Click the bottom left.";
+      gambleHintPending=false;
+    }
+    maybeShowSickleOffer();
+  });
+}
+
+function buyLuck(){
+  const cost=luckCost();
+  if(!spinning&&spend(cost)){
+    luck++;
+    spinPriceUpgradeCount++;
+    completeTutorialUpgrade();
+    document.getElementById("info").textContent=`Luck upgraded to ${luck}`;
+    update();
+  }
+}
+
+function buyMult(){
+  const cost=multCost();
+  if(!spinning&&spend(cost)){
+    shopMult++;
+    spinPriceUpgradeCount++;
+    completeTutorialUpgrade();
+    document.getElementById("info").textContent=`Multiplier upgraded to x${shopMult}`;
+    update();
+  }
+}
+
+function buyJackpot(){
+  const cost=jackpotCost();
+  if(!spinning&&spend(cost)){
+    jackpotLevel++;
+    spinPriceUpgradeCount++;
+    completeTutorialUpgrade();
+    document.getElementById("info").textContent=`Jackpot chance upgraded to ${Math.round((0.015+jackpotLevel*0.005)*100)}%`;
+    update();
+  }
+}
+
+function openSackShop(){
+  document.getElementById("sackModal").classList.add("active");
+}
+
+function closeSackShop(){
+  document.getElementById("sackModal").classList.remove("active");
+}
+
+function buySack(amount){
+  if(tutorialActive&&tutorialStep===4&&amount!==10){
+    document.getElementById("info").textContent="For this tutorial, buy the Small Sack.";
+    return;
+  }
+  if(!spinning&&spend(amount)){
+    sackInventory[amount]++;
+    document.getElementById("info").textContent=`Saved a ${amount.toLocaleString()}-coin sack`;
+    update();
+    if(tutorialActive&&tutorialStep===4&&amount===10){
+      closeSackShop();
+      tutorialStep=5;
+      setTutorialMessage("Tutorial — Step 6: Spin two times. These rounds will not make any patterns.");
+    }
+  }
+}
+
+function buySickle(){
+  if(!sickleOfferActive) return;
+  const cost=sickleCost();
+  if(!spinning&&spend(cost)){
+    sickleRolls+=2;
+    hideSickleOffer();
+    document.getElementById("info").textContent="Sickle ready: next 2 spins pay x2";
+    update();
+  }
+}
+
+function toggleAudio(){
+  audioOn=!audioOn;
+  trackTutorialMenu("audio");
+  update();
+}
+
+function toggleSpinMode(){
+  if(spinning) return;
+  spinBatch=spinBatch===3?1:3;
+  update();
+}
+
+function openDoubleOrNothing(){
+  if(spinning) return;
+  checkSacks(2);
+  if(!infiniteCoins&&coins<2) return;
+  doubleChoice=null;
+  const coin=document.getElementById("flipCoin");
+  const wager=document.getElementById("doubleWager");
+  const maxEven=infiniteCoins?999999998:Math.max(0,coins-(coins%2));
+  wager.value=Math.min(maxEven,Math.max(2,Number(wager.value)||2));
+  wager.max=infiniteCoins?999999999:coins;
+  document.getElementById("doubleError").textContent="";
+  coin.textContent="🐔";
+  coin.classList.remove("flipping");
+  document.getElementById("doubleModal").classList.add("active");
+}
+
+function closeDoubleOrNothing(){
+  document.getElementById("doubleModal").classList.remove("active","dark-flip");
+}
+
+function chooseDoubleOrNothing(choice){
+  if(spinning) return;
+  const coin=document.getElementById("flipCoin");
+  if(coin.classList.contains("flipping")) return;
+  const error=document.getElementById("doubleError");
+  error.textContent="";
+  let wager=Math.floor(Number(document.getElementById("doubleWager").value));
+  if(!Number.isFinite(wager)||wager<2){
+    document.getElementById("info").textContent="Wager must be an even number of at least 2.";
+    return;
+  }
+  if(wager%2!==0){
+    error.textContent="Number has to be even!";
+    return;
+  }
+  if(!infiniteCoins) wager=Math.min(wager,coins);
+  if(wager%2!==0){
+    error.textContent="Number has to be even!";
+    return;
+  }
+  if(wager<2) return;
+  doubleChoice=choice;
+  const won=Math.random()<.55;
+  const result=won?choice:(choice==="heads"?"tails":"heads");
+  const heads=result==="heads";
+  if(!infiniteCoins) coins-=wager;
+  document.getElementById("earned").textContent="💰 Earned: -"+wager;
+  document.getElementById("info").textContent=`Wagered ${wager} coins...`;
+  update();
+  coin.classList.remove("flipping");
+  void coin.offsetWidth;
+  coin.classList.add("flipping");
+  document.getElementById("doubleModal").classList.add("dark-flip");
+  playDarkFlipMusic();
+  beep(520,0.1);
+  // Reveal the result during the final descent, before the coin reaches the table.
+  // This prevents it from visibly landing on the old side and then changing.
+  setTimeout(()=>{
+    coin.textContent=heads?"🐔":"🐤";
+  },1600);
+
+  setTimeout(()=>{
+    coin.classList.remove("flipping");
+    coin.textContent=heads?"🐔":"🐤";
+    const won=doubleChoice===result;
+    if(won){
+      const gained=infiniteCoins?"Infinity":wager*2;
+      if(!infiniteCoins) coins+=wager*2;
+      document.getElementById("earned").textContent="💰 Earned: "+gained;
+      document.getElementById("info").textContent=`${heads?"🐔 Heads":"🐤 Tails"}! You guessed right. Wager doubled!`;
+      beep(880,0.22);
+    }else{
+      document.getElementById("earned").textContent="💰 Earned: 0";
+      document.getElementById("info").textContent=`${heads?"🐔 Heads":"🐤 Tails"}. Wrong guess. No coins came back.`;
+      beep(110,0.35);
+      checkSacks();
+    }
+    update();
+    advanceTutorialAfterFlip();
+    setTimeout(closeDoubleOrNothing,900);
+  },2100);
+}
+
+function openMenu(){
+  document.getElementById("menuModal").classList.add("active");
+}
+
+function closeMenu(){
+  document.getElementById("menuModal").classList.remove("active");
+}
+
+function openHelp(){
+  trackTutorialMenu("help");
+  document.getElementById("helpModal").classList.add("active");
+}
+
+function closeHelp(){
+  document.getElementById("helpModal").classList.remove("active");
+}
+
+function openCodes(){
+  document.getElementById("codesModal").classList.add("active");
+  document.getElementById("codeInput").focus();
+}
+
+function closeCodes(){
+  document.getElementById("codesModal").classList.remove("active");
+}
+
+function registerSpin(){
+  completedSpinCount++;
+  if(completedSpinCount>=nextGambleHint){
+    gambleHintPending=true;
+    nextGambleHint=completedSpinCount+10+Math.floor(Math.random()*11);
+  }
+}
+
+function showRareFactoryEvent(){
+  const modal=document.getElementById("rareImageModal");
+  modal.classList.remove("active");
+  void modal.offsetWidth;
+  modal.classList.add("active");
+  playVineBoom();
+  clearTimeout(rareEventTimer);
+  rareEventTimer=setTimeout(closeRareFactoryEvent,950);
+}
+
+function closeRareFactoryEvent(){
+  document.getElementById("rareImageModal").classList.remove("active");
+  clearTimeout(rareEventTimer);
+  rareEventTimer=null;
+}
+
+function enableFactoryMode(){
+  factoryMode=true;
+  document.body.classList.add("factory-mode");
+}
+
+function disableFactoryMode(){
+  factoryMode=false;
+  document.body.classList.remove("factory-mode");
+}
+
+function submitCode(){
+  const input=document.getElementById("codeInput");
+  const code=input.value.trim();
+  if(code==="I love fried chicken"){
+    infiniteCoins=true;
+    coins=999999999;
+    document.getElementById("info").textContent="Code accepted: infinite coins";
+    beep(980,0.22);
+    closeCodes();
+    update();
+  }else if(code==="el secreto"){
+    guaranteedJackpot=true;
+    document.getElementById("info").textContent="Code accepted: next spin is a jackpot";
+    beep(760,0.16);
+    closeCodes();
+    update();
+  }else if(code==="factory no good"){
+    enableFactoryMode();
+    document.getElementById("info").textContent="Code accepted: textures changed";
+    beep(690,0.18);
+    closeCodes();
+  }else if(code==="factory yes good"){
+    disableFactoryMode();
+    document.getElementById("info").textContent="Code accepted: textures restored";
+    beep(880,0.18);
+    closeCodes();
+  }else if(code==="Tutorial"){
+    if(!tutorialActive){
+      document.getElementById("info").textContent="The Tutorial code only works during the tutorial";
+      beep(180,0.12);
+    }else if(tutorialCodeRedeemed){
+      document.getElementById("info").textContent="Tutorial code was already used";
+      beep(180,0.12);
+    }else{
+      tutorialCodeRedeemed=true;
+      shopMult++;
+      document.getElementById("info").textContent="Code accepted: free Multiplier upgrade";
+      beep(900,0.2);
+      if(tutorialActive&&tutorialStep===3){
+        closeCodes();
+        setTutorialMessage("Tutorial — Step 5: Check the rest of Menu: Audio, How It Works, and Patterns Menu.");
+        input.value="";
+        return;
+      }
+      update();
+    }
+  }else if(code.toLowerCase()==="lucky ducky"){
+    if(luckyDuckyRedeemed){
+      document.getElementById("info").textContent="Lucky Ducky was already used this game";
+      beep(180,0.12);
+    }else{
+      luckyDuckyRedeemed=true;
+      luck++;
+      document.getElementById("info").textContent="Lucky Ducky accepted: free Luck upgrade";
+      beep(860,0.18);
+      update();
+    }
+  }else{
+    document.getElementById("info").textContent="Code not found";
+    beep(180,0.12);
+  }
+  input.value="";
+}
+
+homeTipTimer=setInterval(rotateHomeTip,5000);
+update();
+</script>
+</body>
+</html>
